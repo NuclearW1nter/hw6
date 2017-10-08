@@ -1,0 +1,26 @@
+{
+  "name": "part5",
+  "version": "1.0.0",
+  "description": "Rest of the backend",
+  "main": "index.js",
+  "dependencies": {
+    "fetch": "^1.1.0",
+    "firebase": "^4.5.0",
+    "node-fetch": "^1.7.3",
+    "nodemon": "^1.12.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NuclearW1nter/SWE-Project-hw-5.git"
+  },
+  "author": "Justin Plassmeyer",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/NuclearW1nter/SWE-Project-hw-5/issues"
+  },
+  "homepage": "https://github.com/NuclearW1nter/SWE-Project-hw-5#readme"
+}
