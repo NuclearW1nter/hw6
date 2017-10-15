@@ -4,6 +4,7 @@
   "description": "Rest of the backend",
   "main": "index.js",
   "dependencies": {
+    "express": "^4.16.2",
     "fetch": "^1.1.0",
     "firebase": "^4.5.0",
     "node-fetch": "^1.7.3",

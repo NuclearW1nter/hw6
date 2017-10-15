@@ -74,6 +74,14 @@ class Diablo_Character_Data
         }
         return classMostPlayed;
     }
+    NextClass()
+    {
+        var classPlayTimeOverall = new Map()
+        for (let iter in this.D3_data["seasonalProfiles"]["season0"]["timePlayed"]) {
+            classPlayTimeOverall.set(iter, this.D3_data["seasonalProfiles"]["season0"]["timePlayed"][iter]);
+        }
+        
+    }
 }
 
 class HeroData{
@@ -100,12 +108,22 @@ class HeroData{
         retrunArray.push(infoList);
         return retrunArray;
     }
+    Followers(){
+        var followers_used = []
+        for (let i in this.characterData["followers"]){
+            if(Object.keys(this.characterData["followers"][i]["items"]).length != 0){
+                followers_used.push(i);
+            }
+        }
+        return followers_used;
+    }
 }
 
 const express = require('express');
 const app = express();
 const fetch = require('node-fetch');
 const firebase = require("firebase");
+var errorFound;
 var rawUserData;
 var rawHeroData;
 var username;
@@ -134,30 +152,70 @@ app.route('/user/:userid')
     .all(function (req,res,next) {
         promise = new Promise(function (resolve,reject) {
             username = req.params.userid;
+            errorFound = 0;
             var url = 'https://us.api.battle.net/d3/profile/' + username + '/?locale=en_US&apikey=twqr2eysu74xn7ezw9a68tsf3wyub25x';
             fetch(url)
                 .then((res) =>{
                     return res.json();
                 }).then((json) => {
                 rawUserData = json;
+                if (rawUserData["code"] == "NOTFOUND"){
+                    errorFound = 1;
+                    res.send("Invalid User Name");
+                }
             }).catch(function (e) {
                 console.log("There was some sort of error");
                 console.log(e);
+                res.send("You have entered in the wrong user name.");
             });
         })
         next();
     })
     .get(function (req,res){
+        if (errorFound === 1){
+            res.send('You have entered an invalid username.')
+        }
         var userData = new Diablo_Character_Data(rawUserData);
         var heroMap = userData.CharacterMap();
         var mapIter = heroMap.keys();
+        var heroData;
+        var characterId = [];
+        var heroInfo = [];
+        var itemPlaces = ['rightFinger', 'leftFinger', 'neck','offHand','waist','mainHand','torso','feet','hands','shoulders','legs','bracers','head'];
         let tempKey;
         let database = firebase.database();
         for (let x of heroMap){
             tempKey = mapIter.next().value;
+            characterId.push(tempKey);
             database.ref(`username/${req.params.userid}/` + tempKey).set(
                 { heroname: heroMap.get(tempKey)
                 });
+        }
+        for (let names of characterId){
+            promise = new Promise(function (resolve, reject) {
+                var url = 'https://us.api.battle.net/d3/profile/' + username +"/hero/"+ names + '?locale=en_US&apikey=twqr2eysu74xn7ezw9a68tsf3wyub25x';
+                fetch(url)
+                .then((res) => {
+                    return res.json();
+                }).then((json) => {
+                    rawHeroData = json;
+                    heroData = new HeroData(rawHeroData);
+                    heroInfo = heroData.GeneralInfo();
+                    for (let i = 0; i <10; i++){
+                        database.ref(`username/${req.params.userid}/${names}/General Info/`+ heroInfo[0][i]).set(
+                        { Info : heroInfo[1][i]
+                        });
+                    }
+                    for (let i = 0; i<3; i++){
+
+                    }
+
+                }).catch(function (e) {
+                    console.log("There was some sort of error");
+                    console.log(e);
+                });
+            })
+
         }
         res.send(`User data has been acquired for : ${req.params.userid}`);
     });
