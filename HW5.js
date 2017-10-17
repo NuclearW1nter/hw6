@@ -76,13 +76,80 @@ class Diablo_Character_Data
     }
     NextClass()
     {
-        var classPlayTimeOverall = new Map()
-        for (let iter in this.D3_data["seasonalProfiles"]["season0"]["timePlayed"]) {
-            classPlayTimeOverall.set(iter, this.D3_data["seasonalProfiles"]["season0"]["timePlayed"][iter]);
+        var availableClasses = ["barbarian","crusader","demon-hunter","monk","necromancer","witch-doctor","wizard"];
+        var classPlaytime = [0,0,0,0,0,0,0];
+        var season0PlayTime = [];
+
+        var iteration;
+        for (let iter in this.D3_data["seasonalProfiles"]) {
+            iteration = 0;
+            for (let i in this.D3_data["seasonalProfiles"][iter]["timePlayed"]) {
+                if (iter == "season0"){
+                    season0PlayTime.push(this.D3_data["seasonalProfiles"][iter]["timePlayed"][i]);
+                }
+                else{
+                    classPlaytime[iteration] = classPlaytime[iteration] + this.D3_data["seasonalProfiles"][iter]["timePlayed"][i];
+                    iteration++;
+                }
+
+            }
+
         }
-        
+
+        var lastTime = [];
+        var playMap =  new Map();
+        var lastThree;
+        var tempid;
+        for (let iter in this.D3_heroes){
+            for(let iterator in this.D3_heroes[iter]){
+                if (iterator === "class"){
+                    tempid = this.D3_heroes[iter][iterator];
+                }
+                else if (iterator === "last-updated"){
+                    lastTime.push(this.D3_heroes[iter][iterator]);
+                    playMap.set(this.D3_heroes[iter][iterator],tempid);
+                }
+            }
+        }
+        lastTime.sort(function (a,b) {
+            return a - b;
+        });
+        lastTime.reverse();
+        lastThree = lastTime.slice(0,3);
+        let notLastThree = lastTime.slice(3);
+        notLastThree.forEach(x => playMap.delete(x));
+        var lastPlayed = [];
+        for (let i of playMap){
+            lastPlayed.push(i[1]);
+        }
+        var currentClass = lastPlayed[0];
+        var twoFound = false;
+        var threeFound = false;
+        if(currentClass == lastPlayed[1] && currentClass == lastPlayed[2]){
+            threeFound = true;
+        }
+        else if( currentClass == lastPlayed[1] || currentClass == lastPlayed[2]){
+            twoFound = true;
+        }
+        else if ( lastPlayed[1] == lastPlayed[2]){
+            currentClass == lastPlayed[1];
+        }
+        if (threeFound == true || twoFound == true){
+            let indexOfplayedClass = availableClasses.indexOf(currentClass);
+            classPlaytime[indexOfplayedClass] = classPlaytime[indexOfplayedClass] + 100;
+        }
+        var currentTop = 0;
+        for (let x = 1; x < 7; x++){
+            if (classPlaytime[currentTop] > classPlaytime[x]){
+                currentTop = x;
+            }
+        }
+        var classToPlay = availableClasses[currentTop];
+        return classToPlay;
     }
+
 }
+
 
 class HeroData{
     constructor(data){
@@ -127,7 +194,7 @@ var errorFound;
 var rawUserData;
 var rawHeroData;
 var username;
-
+var nextClassToPlay;
 var config = {
     apiKey: "AIzaSyBmZQF4USrZKDDbGlVjx_S4oiIBpPDvnGY",
     authDomain: "swe-project-hw.firebaseapp.com",
@@ -148,6 +215,23 @@ app.listen(app.get('port'), function() {
 app.get('/', function (req,res){
     res.send("Please get your Diablo 3 account's username and number and got to /user/(your username)-#### ");
 });
+app.get('/class/next',function (req,res) {
+    res.send(`The next class you should play is ${nextClassToPlay}.`)
+});
+app.get('/playstyle',function (req,res) {
+    res.send("Type choose from fighter, tank, ranged and add it onto /playstyle ie. /playstyle/fighter");
+})
+app.get('/playstyle/:style', function (req, res) {
+    if (req.req.params.style == "fighter"){
+        res.send("You should try working with the Enchantress")
+    }
+    else if (req.req.params.style == "tank"){
+        res.send("You should try working with the Scoundrel")
+    }
+    else if (req.req.params.style == "ranged"){
+        res.send("You should try working with the Templar")
+    }
+});
 app.route('/user/:userid')
     .all(function (req,res,next) {
         promise = new Promise(function (resolve,reject) {
@@ -159,10 +243,6 @@ app.route('/user/:userid')
                     return res.json();
                 }).then((json) => {
                 rawUserData = json;
-                if (rawUserData["code"] == "NOTFOUND"){
-                    errorFound = 1;
-                    res.send("Invalid User Name");
-                }
             }).catch(function (e) {
                 console.log("There was some sort of error");
                 console.log(e);
@@ -181,6 +261,7 @@ app.route('/user/:userid')
         var heroData;
         var characterId = [];
         var heroInfo = [];
+        nextClassToPlay = userData.NextClass();
         var itemPlaces = ['rightFinger', 'leftFinger', 'neck','offHand','waist','mainHand','torso','feet','hands','shoulders','legs','bracers','head'];
         let tempKey;
         let database = firebase.database();
@@ -206,11 +287,13 @@ app.route('/user/:userid')
                         { Info : heroInfo[1][i]
                         });
                     }
-                    for (let i = 0; i<3; i++){
-
+                    followerData = heroData.Followers();
+                    for (let x of followerData){
+                        database.ref(`username/${req.params.userid}/${names}/Followers/`).set({
+                            Follower : x
+                        });
                     }
-
-                }).catch(function (e) {
+                 }).catch(function (e) {
                     console.log("There was some sort of error");
                     console.log(e);
                 });
