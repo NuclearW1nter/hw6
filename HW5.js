@@ -184,6 +184,42 @@ class HeroData{
         }
         return followers_used;
     }
+    ItemsAndSkill(){
+        var items = [];
+        var skillsActive = [];
+        var skillsPassive = [];
+        for (let iter in this.characterData["items"]){
+            for (let i in this.characterData['items'][iter]){
+                if (i == 'name'){
+                    items.push(this.characterData['items'][iter][i]);
+                }
+            }
+        }
+        for (let i in this.characterData['skills']){
+            if (i == 'active'){
+                for (let iter in this.characterData['skills'][i]){
+                    for(let iterator in this.characterData['skills'][i][iter]){
+                        if (iterator == 'skill'){
+                            skillsActive.push(this.characterData['skills'][i][iter][iterator]['name']);
+                        }
+                    }
+                }
+            }
+            if (i == 'passive'){
+                for (let iter in this.characterData['skills'][i]){
+                    for(let iterator in this.characterData['skills'][i][iter]){
+                        skillsPassive.push(this.characterData['skills'][i][iter][iterator]['name']);
+                    }
+                }
+            }
+        }
+        var returnArray = []
+        returnArray.push(items);
+        returnArray.push(skillsActive);
+        returnArray.push(skillsPassive);
+        return returnArray;
+
+    }
 }
 
 const express = require('express');
@@ -195,6 +231,7 @@ var rawUserData;
 var rawHeroData;
 var username;
 var nextClassToPlay;
+var itmsAndskill = [];
 var config = {
     apiKey: "AIzaSyBmZQF4USrZKDDbGlVjx_S4oiIBpPDvnGY",
     authDomain: "swe-project-hw.firebaseapp.com",
@@ -222,7 +259,7 @@ app.get('/playstyle',function (req,res) {
     res.send("Type choose from fighter, tank, ranged and add it onto /playstyle ie. /playstyle/fighter");
 })
 app.get('/playstyle/:style', function (req, res) {
-    if (req.req.params.style == "fighter"){
+    if (req.params.style == "fighter"){
         res.send("You should try working with the Enchantress")
     }
     else if (req.req.params.style == "tank"){
@@ -243,6 +280,72 @@ app.route('/user/:userid')
                     return res.json();
                 }).then((json) => {
                 rawUserData = json;
+            }).then((data) => {
+                if (errorFound === 1){
+                    res.send('You have entered an invalid username.')
+                }
+                var userData = new Diablo_Character_Data(rawUserData);
+                var heroMap = userData.CharacterMap();
+                var mapIter = heroMap.keys();
+                var heroData;
+                var characterId = [];
+                var heroInfo = [];
+                nextClassToPlay = userData.NextClass();
+                var itemPlaces = ['rightFinger', 'leftFinger', 'neck','offHand','waist','mainHand','torso','feet','hands','shoulders','legs','bracers','head'];
+                let tempKey;
+                let database = firebase.database();
+                for (let x of heroMap){
+                    tempKey = mapIter.next().value;
+                    characterId.push(tempKey);
+                    database.ref(`username/${req.params.userid}/` + tempKey).set(
+                        { heroname: heroMap.get(tempKey)
+                        });
+                }
+                for (let names of characterId){
+                    promise = new Promise(function (resolve, reject) {
+                        var url = 'https://us.api.battle.net/d3/profile/' + username +"/hero/"+ names + '?locale=en_US&apikey=twqr2eysu74xn7ezw9a68tsf3wyub25x';
+                        fetch(url)
+                            .then((res) => {
+                                return res.json();
+                            }).then((json) => {
+                            rawHeroData = json;
+                            heroData = new HeroData(rawHeroData);
+                            heroInfo = heroData.GeneralInfo();
+                            itmsAndskill = heroData.ItemsAndSkill();
+                            for (let i = 0; i < itmsAndskill[0].length;i++){
+                                database.ref(`username/${req.params.userid}/${names}/items/`+ itemPlaces[i]).set(
+                                    { item : itmsAndskill[0][i]
+                                    });
+                            }
+                            let skillSet = ['skill1','skill2','skill3','skill4','skill5','skill6']
+                            for (let i = 0; i < itmsAndskill[1].length;i++){
+                                database.ref(`username/${req.params.userid}/${names}/Active Skills/` +skillSet[i] ).set(
+                                    { skill : itmsAndskill[1][i]
+                                    });
+                            }
+                            for (let i = 0; i < itmsAndskill[2].length;i++){
+                                database.ref(`username/${req.params.userid}/${names}/Passive Skills/`+ skillSet[i]).set(
+                                    { skill : itmsAndskill[2][i]
+                                    });
+                            }
+                            for (let i = 0; i <10; i++){
+                                database.ref(`username/${req.params.userid}/${names}/General Info/`+ heroInfo[0][i]).set(
+                                    { Info : heroInfo[1][i]
+                                    });
+                            }
+                            followerData = heroData.Followers();
+                            for (let x of followerData){
+                                database.ref(`username/${req.params.userid}/${names}/Followers/`).set({
+                                    Follower : x
+                                });
+                            }
+                        }).catch(function (e) {
+                            console.log("There was some sort of error");
+                            console.log(e);
+                        });
+                    })
+
+                }
             }).catch(function (e) {
                 console.log("There was some sort of error");
                 console.log(e);
@@ -252,57 +355,55 @@ app.route('/user/:userid')
         next();
     })
     .get(function (req,res){
-        if (errorFound === 1){
-            res.send('You have entered an invalid username.')
-        }
-        var userData = new Diablo_Character_Data(rawUserData);
-        var heroMap = userData.CharacterMap();
-        var mapIter = heroMap.keys();
-        var heroData;
-        var characterId = [];
-        var heroInfo = [];
-        nextClassToPlay = userData.NextClass();
-        var itemPlaces = ['rightFinger', 'leftFinger', 'neck','offHand','waist','mainHand','torso','feet','hands','shoulders','legs','bracers','head'];
-        let tempKey;
-        let database = firebase.database();
-        for (let x of heroMap){
-            tempKey = mapIter.next().value;
-            characterId.push(tempKey);
-            database.ref(`username/${req.params.userid}/` + tempKey).set(
-                { heroname: heroMap.get(tempKey)
-                });
-        }
-        for (let names of characterId){
-            promise = new Promise(function (resolve, reject) {
-                var url = 'https://us.api.battle.net/d3/profile/' + username +"/hero/"+ names + '?locale=en_US&apikey=twqr2eysu74xn7ezw9a68tsf3wyub25x';
-                fetch(url)
-                .then((res) => {
-                    return res.json();
-                }).then((json) => {
-                    rawHeroData = json;
-                    heroData = new HeroData(rawHeroData);
-                    heroInfo = heroData.GeneralInfo();
-                    for (let i = 0; i <10; i++){
-                        database.ref(`username/${req.params.userid}/${names}/General Info/`+ heroInfo[0][i]).set(
-                        { Info : heroInfo[1][i]
-                        });
-                    }
-                    followerData = heroData.Followers();
-                    for (let x of followerData){
-                        database.ref(`username/${req.params.userid}/${names}/Followers/`).set({
-                            Follower : x
-                        });
-                    }
-                 }).catch(function (e) {
-                    console.log("There was some sort of error");
-                    console.log(e);
-                });
-            })
-
-        }
         res.send(`User data has been acquired for : ${req.params.userid}`);
     });
-
+var keys;
+var storedData;
+app.get('/itemset/:characterid',function (req,res){
+    var itemSet = [];
+    var skillSet = [];
+    var itemName = [];
+    var passive = [];
+    let database = firebase.database();
+    var ref = database.ref(`username/${username}/${req.params.characterid}`);
+    ref.on('value',gotData, errData);
+    for (let i in storedData){
+        if (i == "items"){
+            for (let iter in storedData[i]){
+                itemName.push(iter);
+                itemSet.push(storedData[i][iter]['item']);
+            }
+        }
+        if (i == "Active Skills"){
+            for (let iter in storedData[i]){
+                skillSet.push(storedData[i][iter]['skill']);
+            }
+        }
+        if (i == "Passive Skills"){
+            for (let iter in storedData[i]){
+                passive.push(storedData[i][iter]['skill']);
+            }
+        }
+    }
+    var msg = "Your items are: ";
+    for (let i = 0; i <itemSet.length; i++){
+        msg += ` ${itemName[i]} -> ${itemSet[i]}`;
+    }
+    if (skillSet == undefined || passive == undefined || skillSet == null){
+        res.send("try refreshing the page")
+    }
+    else {
+        msg += ` and your active skills are ${skillSet.toString()} and your passive skills are ${passive.toString()}`;
+        res.send(msg);
+    }
+})
+function gotData(data) {
+    storedData = data.val();
+    keys = Object.keys(storedData);
+}
+function errData(err) {
+    console.log('Error has occurred')
+}
 app.route('/characters/last/three')
     .all(function (req,res,next) {
         if (username != undefined) {
