@@ -224,6 +224,9 @@ class HeroData{
 
 const express = require('express');
 const app = express();
+app.use(express.static('public'));
+app.listen(3000,function() {});
+
 const fetch = require('node-fetch');
 const firebase = require("firebase");
 var errorFound;
@@ -245,9 +248,6 @@ firebase.initializeApp(config);
 var database = firebase.database();
 
 app.set('port', (process.env.PORT || 5000));
-app.listen(app.get('port'), function() {
-    console.log('Node app is running on port', app.get('port'));
-});
 
 app.get('/', function (req,res){
     res.send("Please get your Diablo 3 account's username and number and got to /user/(your username)-#### ");
